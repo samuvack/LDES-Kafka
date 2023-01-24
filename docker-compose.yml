@@ -1,0 +1,60 @@
+---
+version: '3'
+volumes:
+  nifi-database-repository:
+  nifi-flowfile-repository:
+  nifi-content-repository:
+  nifi-provenance-repository:
+  nifi-state:
+  nifi-logs:
+  nifi-nars:
+  nifi-conf:
+
+networks:
+  front-tier:
+    driver: bridge
+  back-tier:
+    driver: bridge
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.1.0
+    ports:
+      - 2181:2181
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    container_name: sn-zookeeper
+
+  kafka:
+    image: confluentinc/cp-kafka:7.1.0
+    depends_on:
+      - zookeeper
+    ports:
+      - 9092:9092
+    container_name: sn-kafka
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  
+
+
+  nifi:
+    image: ghcr.io/informatievlaanderen/ldes-workbench-nifi:20221109T103745
+    container_name: nifi-kafka
+    restart: unless-stopped
+    ports:
+      # HTTPS
+      - 8443:8443/tcp
+    volumes:
+      - ./nifi-extensions:/opt/nifi/nifi-current/extensions
+    environment:
+      - NIFI_UI_PORT=8443
+      - SINGLE_USER_CREDENTIALS_USERNAME=admin
+      - SINGLE_USER_CREDENTIALS_PASSWORD=admin123456789
+      - NIFI_WORKFLOW_LISTEN_PORT=9005
+      - NIFI_JVM_HEAP_INIT=8g
+      - NIFI_JVM_HEAP_MAX=8g
